@@ -4,9 +4,9 @@ import pytz
 from plotly import graph_objs as go
 from plotly.subplots import make_subplots
 
-from common import ApiKeyGetMode
-from constants import TimeFormat, TimeInterval, MarketDataVenue
-from spot.service import SpotRestService
+from ad_pipeline.common import ApiKeyGetMode
+from ad_pipeline.constants import TimeInterval, TimeFormat, MarketDataVenue
+from ad_pipeline.spot.service import SpotRestService
 
 srs = SpotRestService(ApiKeyGetMode.LOCAL_FILE, {"local_key_path": "../.localKeys"})
 
