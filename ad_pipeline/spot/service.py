@@ -115,10 +115,9 @@ class SpotRestService(RestService):
             index_keys = ['asset']
         return self.get_prices_assets_latest_raw(asset, time_format).set_index(index_keys)
 
-    def get_prices_assets_historical_raw(self, asset: str, start_date: datetime = None,
-                                         end_date: datetime = None,
-                                         time_interval: TimeInterval = None,
-                                         time_format: TimeFormat = None) -> pd.DataFrame:
+    def get_prices_assets_historical_raw(self, asset: str, start_date: datetime = None, end_date: datetime = None,
+                                         time_interval: TimeInterval = None, time_format: TimeFormat = None,
+                                         batch_period: timedelta = BatchPeriod.HOUR_8, parallel_execution=False) -> pd.DataFrame:
         params = {}
         if start_date is not None:
             params['startDate'] = start_date.isoformat()
@@ -132,7 +131,23 @@ class SpotRestService(RestService):
         url = AMBERDATA_SPOT_REST_PRICES_ENDPOINT + f"assets/{asset}/historical/"
         description = "SPOT Prices Historical By Asset Request"
         lg.info(f"Starting {description}")
-        _df = RestService.get_and_process_response_df(url, params, self._headers(), description)
+        if parallel_execution:
+            _df = self._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+            _df.sort_values('timestamp', inplace=True)
+        else:
+            current_batch_time = start_date
+            _df = None
+            while current_batch_time < end_date:
+                batch_end_time = min(current_batch_time + batch_period, end_date)
+                params['startDate'] = current_batch_time.isoformat(timespec='milliseconds')
+                params['endDate'] = batch_end_time.isoformat(timespec='milliseconds')
+                lg.debug(f"Getting data for startDate:{params['startDate']} and endDate:{params['endDate']}")
+                _batch = RestService.get_and_process_response_df(url, params, self._headers(), description)
+                lg.debug(f"Finished data for startDate:{params['startDate']} and endDate:{params['endDate']}")
+                if not _batch.empty:
+                    _df = _batch.reset_index() if _df is None else pd.concat([_df, _batch.reset_index()],
+                                                                             ignore_index=True)
+                current_batch_time = batch_end_time
         if _df is None:
             lg.warning("No data was returned! Please check your query and/or time range")
         elif 'index' in _df.columns:
