@@ -2,8 +2,8 @@ from setuptools import find_packages, setup
 
 setup(
     name='ad_pipeline',
-    packages=find_packages(include=['ad_pipeline']),
-    version='0.1.2',
+    packages=find_packages(include=['ad_pipeline', 'ad_pipeline.*']),
+    version='0.1.3',
     description='AD Pipeline Beta',
     author='technology@firestorm.capital.com',
     install_requires=[],
