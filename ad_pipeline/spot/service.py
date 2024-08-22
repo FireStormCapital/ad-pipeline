@@ -117,7 +117,7 @@ class SpotRestService(RestService):
 
     def get_prices_assets_historical_raw(self, asset: str, start_date: datetime = None, end_date: datetime = None,
                                          time_interval: TimeInterval = None, time_format: TimeFormat = None,
-                                         batch_period: timedelta = BatchPeriod.HOUR_8, parallel_execution=False) -> pd.DataFrame:
+                                         batch_period: timedelta = BatchPeriod.HOUR_8.value, parallel_execution=False) -> pd.DataFrame:
         params = {}
         if start_date is not None:
             params['startDate'] = start_date.isoformat()
