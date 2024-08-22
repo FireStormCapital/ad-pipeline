@@ -373,10 +373,9 @@ class SpotRestService(RestService):
             index_keys = ['exchange']
         return self.get_ticker_information_raw(exchanges, include_inactive, time_format).set_index(index_keys)
 
-    def get_historical_ticker_raw(self, instrument: str, exchange: MarketDataVenue,
-                                  start_date: datetime = None, end_date: datetime = None,
-                                  time_format: TimeFormat = None, parallel_exec: bool = False,
-                                  batch_period: BatchPeriod = BatchPeriod.HOUR_8) -> pd.DataFrame:
+    def get_historical_ticker_raw(self, instrument: str, exchange: MarketDataVenue, start_date: datetime = None,
+                                  end_date: datetime = None, time_format: TimeFormat = None,
+                                  batch_period: BatchPeriod = BatchPeriod.HOUR_8, parallel_exec: bool = False) -> pd.DataFrame:
         params = {
             'exchange': exchange.value,
         }
@@ -402,7 +401,8 @@ class SpotRestService(RestService):
                               index_keys: List[str] = None) -> pd.DataFrame:
         if index_keys is None:
             index_keys = ['timestamp', 'instrument', 'exchange']
-        return self.get_historical_ticker_raw(instrument, exchange, start_date, end_date, time_format).set_index(index_keys)
+        return self.get_historical_ticker_raw(instrument, exchange, start_date, end_date,
+                                              time_format).set_index(index_keys)
 
     def get_order_book_information_raw(self, exchanges: List[MarketDataVenue] = None, include_inactive: bool = None,
                                        time_format: TimeFormat = None) -> pd.DataFrame:
