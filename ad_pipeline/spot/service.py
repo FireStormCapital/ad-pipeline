@@ -375,7 +375,8 @@ class SpotRestService(RestService):
 
     def get_historical_ticker_raw(self, instrument: str, exchange: MarketDataVenue,
                                   start_date: datetime = None, end_date: datetime = None,
-                                  time_format: TimeFormat = None) -> pd.DataFrame:
+                                  time_format: TimeFormat = None, parallel_exec: bool = False,
+                                  batch_period: BatchPeriod = BatchPeriod.HOUR_8) -> pd.DataFrame:
         params = {
             'exchange': exchange.value,
         }
@@ -388,7 +389,11 @@ class SpotRestService(RestService):
         url = AMBERDATA_SPOT_REST_TICKERS_ENDPOINT + f"{instrument}"
         description = f"SPOT Historical Ticker Request for {instrument}"
         lg.info(f"Starting {description}")
-        return_df = RestService.get_and_process_response_df(url, params, self._headers(), description)
+        if parallel_exec:
+            return_df = RestService._process_parallel(start_date, end_date, batch_period.value, self._headers(), url,
+                                                      params, description)
+        else:
+            return_df = RestService.get_and_process_response_df(url, params, self._headers(), description)
         lg.info(f"Finished {description}")
         return return_df
 
