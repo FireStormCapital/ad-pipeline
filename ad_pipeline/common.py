@@ -114,14 +114,26 @@ class RestService(ABC):
     def _get_response(cls, url: str, params: Dict[str, str], headers: Dict[str, str], description: str,
                       retry_count: int = 5, sleep_duration: float = 10.0) -> [bool, object]:
         while retry_count > 0:
-            lg.info(f"Executing request with url:{url}, params={params}, retryCount:{retry_count}")
-            response = json.loads(requests.get(url, headers=headers, params=params).text)
-            clean_response = cls._validate_response(response, description, url, params)
-            if not clean_response:
-                retry_count -= 1
-                time.sleep(sleep_duration)
-            else:
-                return clean_response, response
+            lg.debug(f"Executing request with url:{url}, params={params}, retryCount:{retry_count}")
+            with requests.session() as session:
+                try:
+                    response_raw = session.get(url, headers=headers, params=params)
+                    response_raw.raise_for_status()
+                    response_data = json.loads(response_raw.text)
+                    clean_response = cls._validate_response(response_data, description, url, params)
+                    if not clean_response:
+                        retry_count -= 1
+                        time.sleep(sleep_duration)
+                    else:
+                        return clean_response, response_data
+                except requests.exceptions.ContentDecodingError as e:
+                    lg.error(f"Decoding error: {e}")
+                    retry_count -= 1
+                    time.sleep(sleep_duration)
+                except requests.exceptions.RequestException as e:
+                    lg.error(f"Request failed: {e}")
+                    retry_count -= 1
+                    time.sleep(sleep_duration)
         return False, None
 
     @classmethod
