@@ -73,7 +73,7 @@ class RestService(ABC):
     def _get_date_ranges_for_parallel(start_date: datetime, end_date: datetime, batch_period: timedelta) -> List[Tuple[datetime, datetime]]:
         date_ranges = []
         batch_start_date = start_date
-        batch_end_date = start_date + batch_period
+        batch_end_date = min(batch_start_date + batch_period, end_date)
         while batch_start_date < end_date:
             date_ranges.append((batch_start_date, batch_end_date))
             batch_start_date = batch_end_date
