@@ -1,5 +1,6 @@
 import json
 import multiprocessing
+import os
 import time
 from abc import ABC
 from datetime import datetime, timedelta
@@ -306,7 +307,8 @@ def get_amberdata_api_key_from_local_file(file_path: str) -> str:
             keys = json.load(file)
             return keys.get('amberdata_api_key')
     except FileNotFoundError:
-        raise FileNotFoundError(f"The file at {file_path} is missing.")
+        full_path = os.path.abspath(file_path)
+        raise FileNotFoundError(f"The file at {full_path} is missing.")
     except KeyError:
         raise KeyError("The 'amberdata_api_key' key is missing in the file.")
     except json.JSONDecodeError:
