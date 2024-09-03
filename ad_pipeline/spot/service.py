@@ -133,7 +133,12 @@ class SpotRestService(RestService):
         lg.info(f"Starting {description}")
         if parallel_execution:
             _df = self._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
-            _df.sort_values('timestamp', inplace=True)
+            # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
+            if 'timestamp' in _df.columns:
+                _df.sort_values('timestamp', inplace=True)
+            elif 'exchangeTimestamp' in _df.columns and 'exchangeTimestampNano' in _df.columns:
+                _df.sort_values(['exchangeTimestamp', 'exchangeTimestampNano'], inplace=True)
+
         else:
             current_batch_time = start_date
             _df = None
@@ -258,7 +263,11 @@ class SpotRestService(RestService):
         lg.info(f"Starting {description}")
         if parallel_execution:
             _df = self._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
-            _df.sort_values('timestamp', inplace=True)
+            # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
+            if 'timestamp' in _df.columns:
+                _df.sort_values('timestamp', inplace=True)
+            elif 'exchangeTimestamp' in _df.columns and 'exchangeTimestampNano' in _df.columns:
+                _df.sort_values(['exchangeTimestamp', 'exchangeTimestampNano'], inplace=True)
         else:
             current_batch_time = start_date
             _df = None
@@ -310,7 +319,11 @@ class SpotRestService(RestService):
             _df = self._process_parallel(start_date, end_date, batch_period,
                                          self._headers(), url, params,
                                          description)
-            _df.sort_values('timestamp', inplace=True)
+            # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
+            if 'timestamp' in _df.columns:
+                _df.sort_values('timestamp', inplace=True)
+            elif 'exchangeTimestamp' in _df.columns and 'exchangeTimestampNano' in _df.columns:
+                _df.sort_values(['exchangeTimestamp', 'exchangeTimestampNano'], inplace=True)
         else:
             current_batch_time = start_date
             _df = None
@@ -398,11 +411,13 @@ class SpotRestService(RestService):
 
     def get_historical_ticker(self, instrument: str, exchange: MarketDataVenue = None, start_date: datetime = None,
                               end_date: datetime = None, time_format: TimeFormat = None,
-                              index_keys: List[str] = None) -> pd.DataFrame:
+                              index_keys: List[str] = None, batch_period: timedelta = BatchPeriod.HOUR_8.value,
+                              parallel_exec: bool = False) -> pd.DataFrame:
         if index_keys is None:
             index_keys = ['timestamp', 'instrument', 'exchange']
         return self.get_historical_ticker_raw(instrument, exchange, start_date, end_date,
-                                              time_format).set_index(index_keys)
+                                              time_format, batch_period=batch_period,
+                                              parallel_exec=parallel_exec).set_index(index_keys)
 
     def get_order_book_information_raw(self, exchanges: List[MarketDataVenue] = None, include_inactive: bool = None,
                                        time_format: TimeFormat = None) -> pd.DataFrame:
@@ -590,22 +605,30 @@ class SpotRestService(RestService):
         url = AMBERDATA_SPOT_REST_TRADES_ENDPOINT + f"{instrument}"
         description = "SPOT Trades Historical Request"
         lg.info(f"Starting {description}")
+
         if parallel_execution:
             _df = self._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
-            _df.sort_values('exchangeTimestamp', inplace=True)
+            # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
+            if 'timestamp' in _df.columns:
+                _df.sort_values('timestamp', inplace=True)
+            elif 'exchangeTimestamp' in _df.columns and 'exchangeTimestampNano' in _df.columns:
+                _df.sort_values(['exchangeTimestamp', 'exchangeTimestampNano'], inplace=True)
         else:
-            current_batch_time = start_date
-            _df = None
-            while current_batch_time < end_date:
-                batch_end_time = min(current_batch_time + batch_period, end_date)
-                params['startDate'] = current_batch_time.isoformat(timespec='milliseconds')
-                params['endDate'] = batch_end_time.isoformat(timespec='milliseconds')
-                lg.debug(f"Getting data for startDate:{params['startDate']} and endDate:{params['endDate']}")
-                _batch = RestService.get_and_process_response_df(url, params, self._headers(), description)
-                lg.debug(f"Finished data for startDate:{params['startDate']} and endDate:{params['endDate']}")
-                if not _batch.empty:
-                    _df = _batch if _df is None else pd.concat([_df, _batch], ignore_index=True)
-                current_batch_time = batch_end_time
+            if start_date is not None and end_date is not None:
+                current_batch_time = start_date
+                _df = None
+                while current_batch_time < end_date:
+                    batch_end_time = min(current_batch_time + batch_period, end_date)
+                    params['startDate'] = current_batch_time.isoformat(timespec='milliseconds')
+                    params['endDate'] = batch_end_time.isoformat(timespec='milliseconds')
+                    lg.debug(f"Getting data for startDate:{params['startDate']} and endDate:{params['endDate']}")
+                    _batch = RestService.get_and_process_response_df(url, params, self._headers(), description)
+                    lg.debug(f"Finished data for startDate:{params['startDate']} and endDate:{params['endDate']}")
+                    if not _batch.empty:
+                        _df = _batch if _df is None else pd.concat([_df, _batch], ignore_index=True)
+                    current_batch_time = batch_end_time
+            else:
+                _df = RestService.get_and_process_response_df(url, params, self._headers(), description)
 
         if _df is None:
             lg.warning("No data was returned! Please check your query and/or time range")

@@ -65,6 +65,11 @@ class FuturesRestService(RestService):
                 raise ValueError("Start and end date must be provided for parallel execution!")
             else:
                 return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+                # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
+                if 'timestamp' in return_df.columns:
+                    return_df.sort_values('timestamp', inplace=True)
+                elif 'exchangeTimestamp' in return_df.columns and 'exchangeTimestampNano' in return_df.columns:
+                    return_df.sort_values(['exchangeTimestamp', 'exchangeTimestampNano'], inplace=True)
         else:
             return_df = RestService.get_and_process_response_df(url, params, self._headers(),
                                                                 description)
@@ -264,6 +269,11 @@ class FuturesRestService(RestService):
                 raise ValueError("Start and end date must be provided for parallel execution!")
             else:
                 return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+                # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
+                if 'timestamp' in return_df.columns:
+                    return_df.sort_values('timestamp', inplace=True)
+                elif 'exchangeTimestamp' in return_df.columns and 'exchangeTimestampNano' in return_df.columns:
+                    return_df.sort_values(['exchangeTimestamp', 'exchangeTimestampNano'], inplace=True)
         else:
             return_df = RestService.get_and_process_response_df(url, params, self._headers(), description)
 
@@ -493,6 +503,11 @@ class FuturesRestService(RestService):
                 raise ValueError("Start and end date must be provided for parallel execution!")
             else:
                 return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+                # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
+                if 'timestamp' in return_df.columns:
+                    return_df.sort_values('timestamp', inplace=True)
+                elif 'exchangeTimestamp' in return_df.columns and 'exchangeTimestampNano' in return_df.columns:
+                    return_df.sort_values(['exchangeTimestamp', 'exchangeTimestampNano'], inplace=True)
         else:
             return_df = RestService.get_and_process_response_df(url, params, self._headers(),
                                                                 description)

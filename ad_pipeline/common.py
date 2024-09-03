@@ -1,6 +1,5 @@
 import json
 import multiprocessing
-import os
 import time
 from abc import ABC
 from datetime import datetime, timedelta
@@ -14,6 +13,8 @@ import pytz
 import requests
 from botocore.exceptions import ClientError
 from loguru import logger as lg
+import os
+
 
 class SecretManager:
 
@@ -208,6 +209,9 @@ class RestService(ABC):
         lg.info(f"Finished request for Start:{params['startDate']} to End: {params['endDate']}")
         if not _df.empty:
             _df.reset_index(inplace=True)
+            # drop the index column
+            if 'index' in _df.columns:
+                _df.drop(columns=['index'], inplace=True)
         return _df
 
     @staticmethod
