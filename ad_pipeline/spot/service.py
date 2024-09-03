@@ -577,7 +577,8 @@ class SpotRestService(RestService):
         return self.get_trades_information_raw(exchange, include_inactive, time_format).set_index(index_keys)
 
     def get_trades_historical_raw(self, instrument: str, exchange: MarketDataVenue, start_date: datetime = None, end_date: datetime = None,
-                                  time_format: TimeFormat = None) -> pd.DataFrame:
+                                  time_format: TimeFormat = None, batch_period: timedelta = BatchPeriod.HOUR_8.value,
+                                  parallel_execution: bool = False) -> pd.DataFrame:
         params = {'exchange': exchange.value}
         if start_date is not None:
             params['startDate'] = start_date.isoformat()
@@ -589,34 +590,38 @@ class SpotRestService(RestService):
         url = AMBERDATA_SPOT_REST_TRADES_ENDPOINT + f"{instrument}"
         description = "SPOT Trades Historical Request"
         lg.info(f"Starting {description}")
-        raw_data = RestService.get_and_process_response_dict(url, params, self._headers(), description)
+        if parallel_execution:
+            _df = self._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+            _df.sort_values('exchangeTimestamp', inplace=True)
+        else:
+            current_batch_time = start_date
+            _df = None
+            while current_batch_time < end_date:
+                batch_end_time = min(current_batch_time + batch_period, end_date)
+                params['startDate'] = current_batch_time.isoformat(timespec='milliseconds')
+                params['endDate'] = batch_end_time.isoformat(timespec='milliseconds')
+                lg.debug(f"Getting data for startDate:{params['startDate']} and endDate:{params['endDate']}")
+                _batch = RestService.get_and_process_response_df(url, params, self._headers(), description)
+                lg.debug(f"Finished data for startDate:{params['startDate']} and endDate:{params['endDate']}")
+                if not _batch.empty:
+                    _df = _batch if _df is None else pd.concat([_df, _batch], ignore_index=True)
+                current_batch_time = batch_end_time
+
+        if _df is None:
+            lg.warning("No data was returned! Please check your query and/or time range")
+        elif 'index' in _df.columns:
+            _df.drop(['index'], axis=1, inplace=True)
         lg.info(f"Finished {description}")
-
-        # Process raw data into DataFrame
-        processed_data = []
-        if 'data' in raw_data:
-            for entry in raw_data['data']:
-                processed_data.append({
-                    'timestamp': entry.get('exchangeTimestamp'),
-                    'timestampNano': entry.get('exchangeTimestampNanoseconds'),
-                    'instrument': instrument,
-                    'side': "BUY" if entry.get('isBuySide') else "SELL",
-                    'price': entry.get('price'),
-                    'volume': entry.get('volume'),
-                    'tradeId': entry.get('tradeId'),
-                    'numOrders': entry.get('numOrders', 'unknown'),
-                    'exchange': entry.get('exchange', 'unknown')  # Default to 'unknown' if exchange is missing
-                })
-
-        # Convert processed data into DataFrame
-        processed_df = pd.DataFrame.from_records(processed_data)
-        return processed_df
+        return _df
 
     def get_trades_historical(self, instrument: str, exchange: MarketDataVenue, start_date: datetime = None, end_date: datetime = None,
-                              time_format: TimeFormat = None, index_keys: List[str] = None) -> pd.DataFrame:
+                              time_format: TimeFormat = None, batch_period = BatchPeriod.HOUR_8.value, parallel_execution: bool = False,
+                              index_keys: List[str] = None) -> pd.DataFrame:
         if index_keys is None:
-            index_keys = ['timestamp', 'instrument', 'exchange']
-        return self.get_trades_historical_raw(instrument, exchange, start_date, end_date, time_format).set_index(index_keys)
+            index_keys = ['exchangeTimestamp', 'exchangeTimestampNanoseconds', 'instrument', 'exchange']
+        raw_df = self.get_trades_historical_raw(instrument, exchange, start_date, end_date, time_format,
+                                                batch_period, parallel_execution)
+        return raw_df.set_index(index_keys)
 
     def get_ohlcv_information_raw(self, exchanges: List[MarketDataVenue] = None, include_inactive: bool = False,
                                   time_interval: TimeInterval = None, time_format: TimeFormat = None) -> pd.DataFrame:
