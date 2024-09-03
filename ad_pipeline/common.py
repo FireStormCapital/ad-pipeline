@@ -201,8 +201,8 @@ class RestService(ABC):
                        url: str,
                        params: Dict,
                        description: str):
-        params['startDate'] = date_tuple[0].astimezone(pytz.utc).isoformat(timespec='milliseconds')
-        params['endDate'] = date_tuple[1].astimezone(pytz.utc).isoformat(timespec='milliseconds')
+        params['startDate'] = date_tuple[0].isoformat(timespec='milliseconds')
+        params['endDate'] = date_tuple[1].isoformat(timespec='milliseconds')
         lg.info(f"Starting request for Start:{params['startDate']} to End: {params['endDate']}")
         _df = RestService.get_and_process_response_df(url, params, headers, description)
         lg.info(f"Finished request for Start:{params['startDate']} to End: {params['endDate']}")
