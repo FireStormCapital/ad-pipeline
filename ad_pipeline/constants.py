@@ -108,6 +108,8 @@ class BatchPeriod(Enum):
     HOUR_16 = timedelta(hours=16)
     HOUR_20 = timedelta(hours=20)
     DAY_1 = timedelta(days=1)
+    DAY_3 = timedelta(days=3)
+    DAY_7 = timedelta(days=7)
 
 class TimeBucket(Enum):
     MINUTES_5 = '5m'
