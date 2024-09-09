@@ -13,6 +13,8 @@ import pytz
 import requests
 from botocore.exceptions import ClientError
 from loguru import logger as lg
+import os
+
 
 class SecretManager:
 
@@ -73,7 +75,7 @@ class RestService(ABC):
     def _get_date_ranges_for_parallel(start_date: datetime, end_date: datetime, batch_period: timedelta) -> List[Tuple[datetime, datetime]]:
         date_ranges = []
         batch_start_date = start_date
-        batch_end_date = start_date + batch_period
+        batch_end_date = min(batch_start_date + batch_period, end_date)
         while batch_start_date < end_date:
             date_ranges.append((batch_start_date, batch_end_date))
             batch_start_date = batch_end_date
@@ -200,13 +202,16 @@ class RestService(ABC):
                        url: str,
                        params: Dict,
                        description: str):
-        params['startDate'] = date_tuple[0].astimezone(pytz.utc).isoformat(timespec='milliseconds')
-        params['endDate'] = date_tuple[1].astimezone(pytz.utc).isoformat(timespec='milliseconds')
+        params['startDate'] = date_tuple[0].isoformat(timespec='milliseconds')
+        params['endDate'] = date_tuple[1].isoformat(timespec='milliseconds')
         lg.info(f"Starting request for Start:{params['startDate']} to End: {params['endDate']}")
         _df = RestService.get_and_process_response_df(url, params, headers, description)
         lg.info(f"Finished request for Start:{params['startDate']} to End: {params['endDate']}")
         if not _df.empty:
             _df.reset_index(inplace=True)
+            # drop the index column
+            if 'index' in _df.columns:
+                _df.drop(columns=['index'], inplace=True)
         return _df
 
     @staticmethod
@@ -221,7 +226,10 @@ class RestService(ABC):
                                       params=params, description=description)
         p = multiprocessing.Pool(cpu_count)
         lg.debug("Starting multi threaded requests...")
-        result_df = pd.concat(p.map(partial_process_batch, date_ranges))
+        result_dfs = p.map(partial_process_batch, date_ranges)
+        result_df = pd.concat([pd.DataFrame()] + result_dfs, ignore_index=True)
+        if result_df.empty:
+            lg.warning("No data returned from any of the parallel requests.")
         lg.debug("Finished multi threaded requests...")
         return result_df
 
@@ -306,7 +314,8 @@ def get_amberdata_api_key_from_local_file(file_path: str) -> str:
             keys = json.load(file)
             return keys.get('amberdata_api_key')
     except FileNotFoundError:
-        raise FileNotFoundError(f"The file at {file_path} is missing.")
+        full_path = os.path.abspath(file_path)
+        raise FileNotFoundError(f"The file at {full_path} is missing.")
     except KeyError:
         raise KeyError("The 'amberdata_api_key' key is missing in the file.")
     except json.JSONDecodeError:

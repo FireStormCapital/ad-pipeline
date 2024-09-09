@@ -65,6 +65,11 @@ class FuturesRestService(RestService):
                 raise ValueError("Start and end date must be provided for parallel execution!")
             else:
                 return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+                # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
+                if 'timestamp' in return_df.columns:
+                    return_df.sort_values('timestamp', inplace=True)
+                elif 'exchangeTimestamp' in return_df.columns and 'exchangeTimestampNano' in return_df.columns:
+                    return_df.sort_values(['exchangeTimestamp', 'exchangeTimestampNano'], inplace=True)
         else:
             return_df = RestService.get_and_process_response_df(url, params, self._headers(),
                                                                 description)
@@ -72,11 +77,12 @@ class FuturesRestService(RestService):
         return return_df
 
     def get_funding_rates(self, instrument: str, exchange: MarketDataVenue, start_date: datetime = None,
-                          end_date: datetime = None,
-                          time_format: TimeFormat = None, index_keys: List[str] = None) -> pd.DataFrame:
+                          end_date: datetime = None, time_format: TimeFormat = None,
+                          batch_period: datetime.timedelta = BatchPeriod.HOUR_12.value, index_keys: List[str] = None,
+                          parallel_execution: bool = False) -> pd.DataFrame:
         if index_keys is None:
             index_keys = ['exchange']
-        return self.get_funding_rates_raw(instrument, exchange, start_date, end_date, time_format).set_index(index_keys)
+        return self.get_funding_rates_raw(instrument, exchange, start_date, end_date, time_format, batch_period, parallel_execution).set_index(index_keys)
 
     def get_funding_batch_historical_raw(self, exchange: MarketDataVenue, instruments: List[str],
                                          start_date: datetime = None,
@@ -188,7 +194,9 @@ class FuturesRestService(RestService):
 
     def get_liquidations_raw(self, instrument: str, exchange: MarketDataVenue, start_date: datetime = None,
                              end_date: datetime = None, time_format: TimeFormat = None,
-                             sort_direction: SortDirection = None) -> pd.DataFrame:
+                             sort_direction: SortDirection = None,
+                             batch_period: datetime.timedelta = BatchPeriod.HOUR_12.value,
+                             parallel_execution: bool = False) -> pd.DataFrame:
         params = {'exchange': exchange.value}
         if start_date is not None:
             params['startDate'] = start_date.isoformat(timespec='milliseconds')
@@ -201,19 +209,33 @@ class FuturesRestService(RestService):
         url = AMBERDATA_FUTURES_REST_LIQUIDATIONS_ENDPOINT + f"{instrument}"
         description = "FUTURES Liquidations Request"
         lg.info(f"Starting {description}")
-        return_df = RestService.get_and_process_response_df(url, params, self._headers(),
-                                                            description)
+        if parallel_execution:
+            if start_date is None or end_date is None:
+                raise ValueError("Start and end date must be provided for parallel execution!")
+            else:
+                return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+                # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
+                if 'timestamp' in return_df.columns:
+                    return_df.sort_values('timestamp', inplace=True)
+                elif 'exchangeTimestamp' in return_df.columns and 'exchangeTimestampNano' in return_df.columns:
+                    return_df.sort_values(['exchangeTimestamp', 'exchangeTimestampNano'], inplace=True)
+        else:
+            return_df = RestService.get_and_process_response_df(url, params, self._headers(),
+                                                                description)
         lg.info(f"Finished {description}")
         return return_df
 
     def get_liquidations(self, instrument: str, exchange: MarketDataVenue, start_date: datetime = None,
                          end_date: datetime = None, time_format: TimeFormat = None,
-                         sort_direction: SortDirection = None, index_keys: List[str] = None) -> pd.DataFrame:
+                         sort_direction: SortDirection = None, index_keys: List[str] = None,
+                         batch_period: datetime.timedelta = BatchPeriod.HOUR_12.value,
+                         parallel_execution: bool = False) -> pd.DataFrame:
         if index_keys is None:
             index_keys = ['exchange', 'instrument']
         return self.get_liquidations_raw(instrument,
-                                         exchange, start_date, end_date, time_format, sort_direction).set_index(
-            index_keys)
+                                         exchange, start_date, end_date, time_format, sort_direction,
+                                         batch_period, parallel_execution).set_index(index_keys)
+
 
     def get_long_short_ratio_information_raw(self, exchanges: [MarketDataVenue] = None, include_inactive: bool = None,
                                              time_format: TimeFormat = None) -> pd.DataFrame:
@@ -240,9 +262,9 @@ class FuturesRestService(RestService):
         return self.get_long_short_ratio_information_raw(exchanges, include_inactive, time_format).set_index(index_keys)
 
     def get_long_short_ratio_raw(self, instrument: str, exchange: MarketDataVenue = None, start_date: datetime = None,
-                                 end_date: datetime = None,
-                                 time_format: TimeFormat = None, time_interval: TimeInterval = None,
-                                 sort_direction: SortDirection = None) -> pd.DataFrame:
+                                 end_date: datetime = None, time_format: TimeFormat = None, time_interval: TimeInterval = None,
+                                 sort_direction: SortDirection = None, batch_period: datetime.timedelta = BatchPeriod.HOUR_1.value,
+                                 parallel_execution: bool = False) -> pd.DataFrame:
         params = {'exchange': exchange.value}
         if start_date is not None:
             params['startDate'] = start_date.isoformat(timespec='milliseconds')
@@ -258,8 +280,20 @@ class FuturesRestService(RestService):
         url = AMBERDATA_FUTURES_REST_LONG_SHORT_RATIO_ENDPOINT + f"{instrument}"
         description = "FUTURES Long Short Request"
         lg.info(f"Starting {description}")
-        return_df = RestService.get_and_process_response_df(url, params, self._headers(),
-                                                            description)
+
+        if parallel_execution:
+            if start_date is None or end_date is None:
+                raise ValueError("Start and end date must be provided for parallel execution!")
+            else:
+                return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+                # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
+                if 'timestamp' in return_df.columns:
+                    return_df.sort_values('timestamp', inplace=True)
+                elif 'exchangeTimestamp' in return_df.columns and 'exchangeTimestampNano' in return_df.columns:
+                    return_df.sort_values(['exchangeTimestamp', 'exchangeTimestampNano'], inplace=True)
+        else:
+            return_df = RestService.get_and_process_response_df(url, params, self._headers(), description)
+
         if not return_df.empty and 'timestamp' in return_df.columns:
             return_df['time'] = pd.to_datetime(return_df["timestamp"], unit="ms", utc=True)
         lg.info(f"Finished {description}")
@@ -465,7 +499,9 @@ class FuturesRestService(RestService):
 
     def get_open_interest_raw(self, instrument: str, exchange: MarketDataVenue, start_date: datetime = None,
                               end_date: datetime = None, time_format: TimeFormat = None,
-                              sort_direction: SortDirection = None):
+                              sort_direction: SortDirection = None,
+                              batch_period: datetime.timedelta = BatchPeriod.HOUR_1.value,
+                              parallel_execution: bool = False) -> pd.DataFrame:
         params = {'exchange': exchange.value}
         if start_date is not None:
             params['startDate'] = start_date.isoformat(timespec='milliseconds')
@@ -478,18 +514,32 @@ class FuturesRestService(RestService):
         url = AMBERDATA_FUTURES_REST_OPEN_INTEREST_ENDPOINT + f"{instrument}"
         description = "FUTURES Open Interest Request"
         lg.info(f"Starting {description}")
-        return_df = RestService.get_and_process_response_df(url, params, self._headers(),
-                                                            description)
+
+        if parallel_execution:
+            if start_date is None or end_date is None:
+                raise ValueError("Start and end date must be provided for parallel execution!")
+            else:
+                return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+                # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
+                if 'timestamp' in return_df.columns:
+                    return_df.sort_values('timestamp', inplace=True)
+                elif 'exchangeTimestamp' in return_df.columns and 'exchangeTimestampNano' in return_df.columns:
+                    return_df.sort_values(['exchangeTimestamp', 'exchangeTimestampNano'], inplace=True)
+        else:
+            return_df = RestService.get_and_process_response_df(url, params, self._headers(),
+                                                                description)
         lg.info(f"Finished {description}")
         return return_df
 
     def get_open_interest(self, instrument: str, exchange: MarketDataVenue, start_date: datetime = None,
                           end_date: datetime = None, time_format: TimeFormat = None,
-                          sort_direction: SortDirection = None, index_keys: List[str] = None) -> pd.DataFrame:
+                          sort_direction: SortDirection = None, index_keys: List[str] = None,
+                          batch_period: datetime.timedelta = BatchPeriod.HOUR_1.value,
+                          parallel_execution: bool = False) -> pd.DataFrame:
         if index_keys is None:
             index_keys = ['exchange']
         return self.get_open_interest_raw(instrument, exchange, start_date, end_date, time_format,
-                                          sort_direction).set_index(index_keys)
+                                          sort_direction, batch_period, parallel_execution).set_index(index_keys)
 
     def get_open_interest_batch_raw(self, exchanges: List[MarketDataVenue], instruments: List[str],
                                     start_date: datetime = None,
