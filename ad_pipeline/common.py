@@ -48,8 +48,9 @@ class RestService(ABC):
     _local_keys_path: str
     _aws_secret_name: str
     _aws_secret_key: str
+    _max_threads: int
 
-    def __init__(self, api_key_get_mode: ApiKeyGetMode, key_get_params: Dict):
+    def __init__(self, api_key_get_mode: ApiKeyGetMode, key_get_params: Dict, max_threads: int = 32):
         self._key_get_mode = api_key_get_mode
         if api_key_get_mode == ApiKeyGetMode.LOCAL_FILE:
             self._local_keys_path = key_get_params['local_key_path']
@@ -61,6 +62,7 @@ class RestService(ABC):
             self._aws_secret_key = key_get_params['aws_secret_key']
         else:
             raise ValueError(f"Invalid API Key Get Mode: {api_key_get_mode}")
+        self._max_threads = max_threads
 
     def _headers(self) -> Dict[str, str]:
         if self._key_get_mode == ApiKeyGetMode.LOCAL_FILE:
@@ -70,6 +72,9 @@ class RestService(ABC):
         else:
             raise ValueError(f"Invalid API Key Get Mode: {self._key_get_mode}")
         return {'accept': 'application/json', 'x-api-key': f'{amberdata_api_key}'}
+
+    def _get_max_threads(self) -> int:
+        return self._max_threads
 
     @staticmethod
     def _get_date_ranges_for_parallel(start_date: datetime, end_date: datetime, batch_period: timedelta) -> List[Tuple[datetime, datetime]]:
@@ -215,10 +220,10 @@ class RestService(ABC):
         return _df
 
     @staticmethod
-    def _process_parallel(start_date: datetime, end_date: datetime, batch_period: timedelta,
-                          headers: Dict[str, str], url: str, params: Dict, description: str):
+    def _process_parallel(start_date: datetime, end_date: datetime, batch_period: timedelta, headers: Dict[str, str],
+                          url: str, params: Dict, description: str, max_threads: int):
         # Use 1 less CPU Than available for safety
-        cpu_count = min(20, multiprocessing.cpu_count())
+        cpu_count = min(max_threads, multiprocessing.cpu_count())
         lg.debug(f"Will use {cpu_count} threads")
         date_ranges = RestService._get_date_ranges_for_parallel(start_date, end_date, batch_period)
         partial_process_batch = partial(RestService._process_batch,
@@ -230,6 +235,8 @@ class RestService(ABC):
         result_df = pd.concat([pd.DataFrame()] + result_dfs, ignore_index=True)
         if result_df.empty:
             lg.warning("No data returned from any of the parallel requests.")
+        lg.debug("Finished multi threaded requests...")
+        result_df = pd.concat(p.map(partial_process_batch, date_ranges))
         lg.debug("Finished multi threaded requests...")
         return result_df
 

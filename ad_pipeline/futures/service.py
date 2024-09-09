@@ -19,8 +19,8 @@ from ad_pipeline.constants import \
 
 class FuturesRestService(RestService):
 
-    def __init__(self, api_key_get_mode: ApiKeyGetMode, api_key_get_params: Dict):
-        RestService.__init__(self, api_key_get_mode, api_key_get_params)
+    def __init__(self, api_key_get_mode: ApiKeyGetMode, api_key_get_params: Dict, max_threads: int = 32):
+        RestService.__init__(self, api_key_get_mode, api_key_get_params, max_threads)
 
     def get_funding_information_raw(self, exchanges: List[MarketDataVenue] = None, include_inactive: bool = None,
                                     time_format: TimeFormat = None) -> pd.DataFrame:
@@ -64,7 +64,8 @@ class FuturesRestService(RestService):
             if start_date is None or end_date is None:
                 raise ValueError("Start and end date must be provided for parallel execution!")
             else:
-                return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+                return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url,
+                                                          params, description, self._get_max_threads())
                 # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
                 if 'timestamp' in return_df.columns:
                     return_df.sort_values('timestamp', inplace=True)
@@ -209,11 +210,13 @@ class FuturesRestService(RestService):
         url = AMBERDATA_FUTURES_REST_LIQUIDATIONS_ENDPOINT + f"{instrument}"
         description = "FUTURES Liquidations Request"
         lg.info(f"Starting {description}")
+
         if parallel_execution:
             if start_date is None or end_date is None:
                 raise ValueError("Start and end date must be provided for parallel execution!")
             else:
-                return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+                return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url,
+                                                          params, description, self._get_max_threads())
                 # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
                 if 'timestamp' in return_df.columns:
                     return_df.sort_values('timestamp', inplace=True)
@@ -235,7 +238,6 @@ class FuturesRestService(RestService):
         return self.get_liquidations_raw(instrument,
                                          exchange, start_date, end_date, time_format, sort_direction,
                                          batch_period, parallel_execution).set_index(index_keys)
-
 
     def get_long_short_ratio_information_raw(self, exchanges: [MarketDataVenue] = None, include_inactive: bool = None,
                                              time_format: TimeFormat = None) -> pd.DataFrame:
@@ -285,7 +287,8 @@ class FuturesRestService(RestService):
             if start_date is None or end_date is None:
                 raise ValueError("Start and end date must be provided for parallel execution!")
             else:
-                return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+                return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url,
+                                                          params, description, self._get_max_threads())
                 # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
                 if 'timestamp' in return_df.columns:
                     return_df.sort_values('timestamp', inplace=True)
@@ -519,7 +522,8 @@ class FuturesRestService(RestService):
             if start_date is None or end_date is None:
                 raise ValueError("Start and end date must be provided for parallel execution!")
             else:
-                return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+                return_df = RestService._process_parallel(start_date, end_date, batch_period, self._headers(), url,
+                                                          params, description, self._get_max_threads())
                 # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
                 if 'timestamp' in return_df.columns:
                     return_df.sort_values('timestamp', inplace=True)

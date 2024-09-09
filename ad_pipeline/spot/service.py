@@ -17,8 +17,8 @@ from ad_pipeline.constants import MarketDataVenue, AMBERDATA_SPOT_REST_EXCHANGES
 
 class SpotRestService(RestService):
 
-    def __init__(self, api_key_get_mode: ApiKeyGetMode, api_key_get_params: Dict):
-        RestService.__init__(self, api_key_get_mode, api_key_get_params)
+    def __init__(self, api_key_get_mode: ApiKeyGetMode, api_key_get_params: Dict, max_threads: int = 32):
+        RestService.__init__(self, api_key_get_mode, api_key_get_params, max_threads)
 
     def get_exchanges_information(self, exchanges: List[MarketDataVenue] = None, instruments: List[str] = None,
                                   time_format: TimeFormat = None) -> Dict:
@@ -132,7 +132,8 @@ class SpotRestService(RestService):
         description = "SPOT Prices Historical By Asset Request"
         lg.info(f"Starting {description}")
         if parallel_execution:
-            _df = self._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+            _df = self._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description,
+                                         self._get_max_threads())
             # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
             if 'timestamp' in _df.columns:
                 _df.sort_values('timestamp', inplace=True)
@@ -262,7 +263,8 @@ class SpotRestService(RestService):
         description = "SPOT Prices Historical By Pair Request"
         lg.info(f"Starting {description}")
         if parallel_execution:
-            _df = self._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+            _df = self._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description,
+                                         self._get_max_threads())
             # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
             if 'timestamp' in _df.columns:
                 _df.sort_values('timestamp', inplace=True)
@@ -316,9 +318,8 @@ class SpotRestService(RestService):
         description = "SPOT Reference Quites Historical By Pair Request"
         lg.info(f"Starting {description}")
         if parallel_execution:
-            _df = self._process_parallel(start_date, end_date, batch_period,
-                                         self._headers(), url, params,
-                                         description)
+            _df = self._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description,
+                                         self._get_max_threads())
             # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
             if 'timestamp' in _df.columns:
                 _df.sort_values('timestamp', inplace=True)
@@ -403,7 +404,7 @@ class SpotRestService(RestService):
         lg.info(f"Starting {description}")
         if parallel_exec:
             return_df = RestService._process_parallel(start_date, end_date, batch_period.value, self._headers(), url,
-                                                      params, description)
+                                                      params, description, self._get_max_threads())
         else:
             return_df = RestService.get_and_process_response_df(url, params, self._headers(), description)
         lg.info(f"Finished {description}")
@@ -418,6 +419,7 @@ class SpotRestService(RestService):
         return self.get_historical_ticker_raw(instrument, exchange, start_date, end_date,
                                               time_format, batch_period=batch_period,
                                               parallel_exec=parallel_exec).set_index(index_keys)
+
 
     def get_order_book_information_raw(self, exchanges: List[MarketDataVenue] = None, include_inactive: bool = None,
                                        time_format: TimeFormat = None) -> pd.DataFrame:
@@ -607,7 +609,8 @@ class SpotRestService(RestService):
         lg.info(f"Starting {description}")
 
         if parallel_execution:
-            _df = self._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description)
+            _df = self._process_parallel(start_date, end_date, batch_period, self._headers(), url, params, description,
+                                         self._get_max_threads())
             # Check if timestamp or exchangeTimestamp + exchangeTimestampNano is present and sort by it otherwise skip sorting
             if 'timestamp' in _df.columns:
                 _df.sort_values('timestamp', inplace=True)
