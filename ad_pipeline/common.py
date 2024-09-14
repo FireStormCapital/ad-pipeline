@@ -182,10 +182,13 @@ class RestService(ABC):
             else:
                 _df = pd.DataFrame.from_dict(payload['data'])
 
+        tz_local = pytz.timezone('US/Eastern')
         # Add UTC & EST Time Columns
         if not _df.empty and 'timestamp' in _df.columns:
-            tz_local = pytz.timezone('US/Eastern')
             _df['timeUTC'] = pd.to_datetime(pd.to_numeric(_df["timestamp"]), unit="ms", utc=True)
+            _df['timeEST'] = _df['timeUTC'].dt.tz_convert(tz_local)
+        elif not _df.empty and 'exchangeTimestamp' in _df.columns:
+            _df['timeUTC'] = pd.to_datetime(pd.to_numeric(_df["exchangeTimestamp"]), unit="ms", utc=True)
             _df['timeEST'] = _df['timeUTC'].dt.tz_convert(tz_local)
         return _df
 
@@ -232,12 +235,10 @@ class RestService(ABC):
         p = multiprocessing.Pool(cpu_count)
         lg.debug("Starting multi threaded requests...")
         result_dfs = p.map(partial_process_batch, date_ranges)
+        lg.debug("Finished multi threaded requests...")
         result_df = pd.concat([pd.DataFrame()] + result_dfs, ignore_index=True)
         if result_df.empty:
             lg.warning("No data returned from any of the parallel requests.")
-        lg.debug("Finished multi threaded requests...")
-        result_df = pd.concat(p.map(partial_process_batch, date_ranges))
-        lg.debug("Finished multi threaded requests...")
         return result_df
 
     @classmethod
