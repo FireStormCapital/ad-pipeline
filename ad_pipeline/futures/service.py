@@ -298,7 +298,7 @@ class FuturesRestService(RestService):
             return_df = RestService.get_and_process_response_df(url, params, self._headers(), description)
 
         if not return_df.empty and 'timestamp' in return_df.columns:
-            return_df['time'] = pd.to_datetime(return_df["timestamp"], unit="ms", utc=True)
+            return_df['timestamp'] = pd.to_datetime(return_df["timestamp"], unit="ms", utc=True)
         lg.info(f"Finished {description}")
         return return_df
 
